@@ -1,0 +1,103 @@
+
+services:
+  mongo-user:
+    image: mongo:latest
+    container_name: mongo-user
+    hostname: mongo-user
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_user_data:/data/db
+
+  mongo-order:
+    image: mongo:latest
+    container_name: mongo-order
+    hostname: mongo-order
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo_order_data:/data/db
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"   # RabbitMQ connection
+      - "15672:15672" # Web dashboard
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+
+  user_service_v1:
+    build:
+      context: ./src
+      dockerfile: user_service_v1/Dockerfile
+    container_name: user_service_v1
+    ports:
+      - "8001:8000"
+    depends_on:
+      - mongo-user
+      - rabbitmq
+    environment:
+      - USER_SERVICE_MONGO_URI=${USER_SERVICE_MONGO_URI}
+      - USER_SERVICE_DB=${USER_SERVICE_DB}
+      - RABBITMQ_URI=${RABBITMQ_URI}
+      - RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - RABBITMQ_QUEUE_NAME=${RABBITMQ_QUEUE_NAME}
+
+  order_service:
+    build:
+      context: ./src
+      dockerfile: order_service/Dockerfile
+    container_name: order_service
+    ports:
+      - "8002:8000"
+    depends_on:
+      - mongo-order
+      - rabbitmq
+    environment:
+      - ORDER_MONGO_URI=${ORDER_MONGO_URI}
+      - ORDER_DB=${ORDER_DB}
+      - RABBITMQ_URI=${RABBITMQ_URI}
+      - RABBITMQ_QUEUE_NAME=${RABBITMQ_QUEUE_NAME}
+      - RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+
+  user_service_v2:
+    build:
+      context: ./src
+      dockerfile: user_service_v2/Dockerfile
+    container_name: user_service_v2
+    ports:
+      - "8003:8000"
+    depends_on:
+      - mongo-user
+      - rabbitmq
+    environment:
+      - USER_SERVICE_MONGO_URI=${USER_SERVICE_MONGO_URI}
+      - USER_SERVICE_DB=${USER_SERVICE_DB}
+      - RABBITMQ_URI=${RABBITMQ_URI}
+      - RABBITMQ_USERNAME=${RABBITMQ_USERNAME}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - RABBITMQ_QUEUE_NAME=${RABBITMQ_QUEUE_NAME}
+
+  api_gateway:
+    build:
+      context: ./src
+      dockerfile: api_gateway/Dockerfile
+    container_name: api_gateway
+    ports:
+      - "8000:8080"
+    volumes:
+      - ./src/api_gateway/config.json:/app/api_gateway/config.json
+    depends_on:
+      - user_service_v1
+      - user_service_v2
+      - order_service
+
+
+volumes:
+  mongo_user_data:
+  mongo_order_data:
+
