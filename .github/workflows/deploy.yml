@@ -29,6 +29,18 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           script: |
             cd /home/ubuntu/app
-            docker-compose down -v
+
+            echo "🛑 Removing ALL containers"
+            docker rm -f $(docker ps -aq) || true
+
+            echo "🧼 Removing ALL images"
+            docker rmi -f $(docker images -aq) || true
+
+            echo "🧹 Removing ALL volumes"
+            docker volume prune -f || true
+
+            echo "🛠️ Starting fresh compose build"
             docker-compose up -d --build
+
+            echo "🧽 Cleanup"
             docker system prune -f
